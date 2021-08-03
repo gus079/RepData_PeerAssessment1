@@ -1,25 +1,163 @@
+----
+title: "Activity monitoring"
+author: "Gustavo Seifer"
+date: "3/8/2021"
+output: html_document
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = '')
+```
+
+## Coursera Data Science - 
+## Course Project #1 - Week 2
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 
-## Loading and preprocessing the data
+Loading packages
+```{r, message=FALSE}
+library(tidyverse)
+library(skimr)
+theme_set(theme_bw())
+```
+
+# Loading dataset
+```{r cars}
+df_raw <- read.csv('activity.csv')
+head(df_raw)
+skim(df_raw)
+```
+
+# What is mean total number of steps taken per day?
+```{r}
+total_steps <- tapply(df_raw$steps, df_raw$date, FUN = sum, na.rm = TRUE)
+
+ggplot(data.frame(total_steps), aes(total_steps)) + 
+  geom_histogram(binwidth = 1000, col = 'blue', fill = "lightblue") + 
+  labs(x = 'Total steps per day') + 
+  ggtitle('Total steps per day')
+
+summary(total_steps)
+
+```
+
+
+# What is the average daily activity pattern?
+
+```{r pressure, echo=FALSE}
+avg <- aggregate(x = list(steps = df_raw$steps), by = list(interval = df_raw$interval), 
+    FUN = mean, na.rm = TRUE)
+ggplot(avg, aes(x = interval, y = steps)) + 
+  geom_line(col = 'blue') + 
+  xlab ("5-minute interval") + 
+  ylab ("Average number of steps") + 
+  ggtitle('Mean daily step pattern')
+
+
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+avg[which.max(avg$steps), ]
+```
+
+# Imputing missing values
+```{r}
+colSums(is.na(df_raw))
+```
+
+Filling in all of the missing values in the dataset with the mean for that 5-minute interval
+```{r}
+impute.value <- function(steps, interval) {
+    imputed <- NA
+    if (!is.na(steps)) 
+        imputed <- c(steps) else imputed <- (avg[avg$interval == interval, "steps"])
+    return(imputed)
+}
+df_imputed <- df_raw
+df_imputed$steps <- mapply(impute.value, df_imputed$steps, df_imputed$interval)
+
+colSums(is.na(df_imputed))
+head(df_imputed)
+```
+
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+```{r}
+total_steps_imp <- tapply(df_imputed$steps, df_imputed$date, FUN = sum)
+ggplot(data.frame(total_steps_imp), aes(total_steps_imp)) + 
+  geom_histogram(binwidth = 1000, col = 'darkgrey', fill = "lightgreen") + 
+  labs(x = 'Total steps per day') + 
+  ggtitle('Total steps per day (imputed data)')
+```
+
+Report the mean and median total number of steps taken per day.
+The mean imputation reduces the variance of the data.
+```{r}
+print(paste("The mean is: ", round(mean(total_steps_imp),2)))
+
+print(paste("The median is: ", round(median(total_steps_imp),2)))
+```
+
+
+Do these values differ from the estimates from the first part of the assignment?
+The mean imputation reduces the variance of the data.
+```{r}
+summary_compare <- data.frame(mean = c(mean(total_steps), mean(total_steps_imp)),
+                              median = c(median(total_steps), median(total_steps_imp)))
+rownames(summary_compare) <- c("Pre Imputation", "Post imputation")
+summary_compare
+
+```
+
+```{r}
+df_imp_ww <- df_imputed
+df_imp_ww$date <- as.Date(df_imp_ww$date)
+df_imp_ww$day <- ifelse(weekdays(df_imp_ww$date) %in% c("Saturday", "Sunday", "domingo", "sabado"), "weekend", "weekday")
+df_imp_ww$day <- as.factor(df_imp_ww$day)
+```
+
+```{r}
+act_weekday <- filter(df_imp_ww, df_imp_ww$day == "weekday")
+act_weekend <- filter(df_imp_ww, df_imp_ww$day == "weekend")
+
+act_weekday <- act_weekday %>%
+        group_by(interval) %>%
+        summarize(steps = mean(steps)) 
+act_weekday$day <- "weekday"
+
+act_weekend <- act_weekend %>%
+        group_by(interval) %>%
+        summarize(steps = mean(steps)) 
+act_weekend$day <- "weekend"
+
+wkdayWkend <- rbind(act_weekday, act_weekend)
+wkdayWkend$day <- as.factor(wkdayWkend$day)
+
+str(wkdayWkend)
+
+
+g <- ggplot (wkdayWkend, aes (interval, steps, color = day))
+g + geom_line() + 
+        theme(axis.text = element_text(size = 12),axis.title = element_text(size = 14)) + 
+        labs(y = "Number of Steps") + labs(x = "Interval") + 
+        ggtitle("Average Number of Steps - Weekday vs. Weekend") + 
+        theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+The graph shows differences in the step patterns throughout the average daily intervals. 
+For weekdays there is a larger spikes in the morning that could imply commuters.
 
 
 
-## What is mean total number of steps taken per day?
 
 
 
-## What is the average daily activity pattern?
 
 
 
-## Imputing missing values
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
